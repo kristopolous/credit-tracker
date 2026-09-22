@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
+import shutil
 import time
 from dataclasses import dataclass
 from urllib.parse import urlparse
@@ -84,6 +86,57 @@ async def fetch(client: httpx.AsyncClient, url: str) -> Page | None:
             )
         resp.raise_for_status()
         return Page(url=url, html=resp.text)
+    except Exception:
+        return None
+
+
+# Some listing/hub pages (cerebralvalley.ai/events, lablab.ai/event) render
+# their actual event cards client-side after load - a plain GET only sees
+# the pre-hydration shell (a handful of links, if any). Lightpanda (a real
+# JS-executing browser engine, github.com/lightpanda-io/browser) runs the
+# page and dumps the DOM *after* hydration, so the full list of event links
+# these pages exist to publish is actually visible. Individual event pages
+# on these same platforms are already server-rendered (the data is right
+# there in a __NEXT_DATA__ blob) and don't need this - only the listing
+# pages themselves do, so this is used narrowly, not as a blanket replacement
+# for the plain-httpx `fetch()` above.
+_LIGHTPANDA_BIN = shutil.which("lightpanda")
+# 8000ms was enough for the plain /events page but too short for
+# /events?startDate=... (that variant's event list hadn't finished
+# hydrating yet at 8s in testing, but reliably had by 15s) - use one
+# conservative wait for both rather than special-casing by URL shape.
+LIGHTPANDA_WAIT_MS = 15000
+LIGHTPANDA_TIMEOUT = 40
+
+
+async def fetch_rendered(url: str) -> Page | None:
+    """Fetch a URL through lightpanda (headless, JS-executing) and return the
+    HTML after client-side hydration. Falls back to None if lightpanda isn't
+    installed or the fetch fails - callers should have a plain-fetch
+    fallback path for that case."""
+    if not _LIGHTPANDA_BIN:
+        return None
+    await throttle(url)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            _LIGHTPANDA_BIN,
+            "fetch",
+            url,
+            "--dump",
+            "html",
+            "--wait-until",
+            "networkidle",
+            "--wait-ms",
+            str(LIGHTPANDA_WAIT_MS),
+            "--json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=LIGHTPANDA_TIMEOUT)
+        data = json.loads(stdout)
+        if data.get("error") or not data.get("content"):
+            return None
+        return Page(url=url, html=data["content"])
     except Exception:
         return None
 

@@ -25,7 +25,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import httpx
 from bs4 import BeautifulSoup
 
-from sponsor_credit_feed.sources.base import Source, fetch, platform_of, throttle
+from sponsor_credit_feed.sources.base import Source, fetch, fetch_rendered, platform_of, throttle
 from sponsor_credit_feed.sources.link_discovery import follow_resource_links
 from sponsor_credit_feed.sources.luma_source import (
     extract_event_urls_from_calendar,
@@ -130,10 +130,17 @@ class HubSource(Source):
                     blobs.append(blob)
             return calendar_urls
 
-        # Round 1: harvest event links from the seeded listing pages.
+        # Round 1: harvest event links from the seeded listing pages. These
+        # listing pages (cerebralvalley.ai/events, lablab.ai/event) populate
+        # their actual event cards client-side after load, so a plain GET
+        # only sees a handful of links in the pre-hydration shell - try
+        # lightpanda (real JS execution) first to see the fully hydrated
+        # list, and fall back to the old plain-fetch path if lightpanda
+        # isn't installed or the fetch fails for some reason.
         discovered: dict[str, None] = {}
         for listing_url in self.listing_urls:
-            html = await fetch_html_via_unlocker(client, listing_url)
+            rendered = await fetch_rendered(listing_url)
+            html = rendered.html if rendered else await fetch_html_via_unlocker(client, listing_url)
             if not html:
                 continue
             soup = BeautifulSoup(html, "lxml")

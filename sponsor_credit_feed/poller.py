@@ -6,10 +6,8 @@ import logging
 import httpx
 
 from sponsor_credit_feed import config
-from sponsor_credit_feed.extract import agent as strands_agent
 from sponsor_credit_feed.extract.code_detector import find_candidates
 from sponsor_credit_feed.feed_store import store
-from sponsor_credit_feed.memory import cognee_memory
 from sponsor_credit_feed.sources.base import Source, platform_of
 
 log = logging.getLogger("poller")
@@ -28,18 +26,9 @@ async def _handle_source(client: httpx.AsyncClient, source: Source) -> None:
 
         candidates = find_candidates(blob["text"])
         for c in candidates:
-            # A mention with no literal code and no QR is just "we saw a
-            # dollar amount somewhere" - not something anyone can actually
-            # redeem. Don't store it at all.
-            if not c.codes and c.kind != "qr":
-                continue
-
-            verdict = strands_agent.classify(c.text) if config.STRANDS_ENABLED else None
-            if verdict is not None and not verdict.get("is_redeemable"):
-                continue
-
-            if config.COGNEE_ENABLED and await cognee_memory.is_duplicate(c.text):
-                continue
+            # find_candidates() already guarantees every candidate here has
+            # a literal code (or QR) and a resolved company - nothing vaguer
+            # than that ever reaches storage.
 
             # Prefer the candidate's own redeem_url for platform tagging,
             # but only when it resolves to one of the three tracked event
@@ -80,8 +69,6 @@ async def _handle_source(client: httpx.AsyncClient, source: Source) -> None:
                 redeem_url=c.redeem_url,
                 service=c.service,
             )
-            if item and config.COGNEE_ENABLED:
-                asyncio.create_task(cognee_memory.remember(c.text))
 
 
 async def run_forever(sources: list[Source]) -> None:

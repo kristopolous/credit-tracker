@@ -65,9 +65,9 @@ async def follow_resource_links(client: httpx.AsyncClient, text: str, event_url:
     stall the whole poll.
 
     `event_url` tags the returned blob(s) as belonging to the same event
-    that linked to them - the doc itself isn't a separate event, it's
-    tonight's resources doc, so every deal found in it should still group
-    under tonight's event card rather than getting its own."""
+    that linked to them - the doc itself isn't a separate event, it's that
+    event's resources doc, so every deal found in it should still group
+    under that event's card rather than getting its own."""
     candidates = [u for u in URL_RE.findall(text) if not SKIP_HOST_RE.search(u)]
     candidates = list(dict.fromkeys(candidates))[:MAX_LINKS_PER_POLL]  # dedupe, keep order
 

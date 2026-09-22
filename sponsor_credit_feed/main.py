@@ -22,6 +22,15 @@ LUMA_EVENT_URLS = [
 CEREBRAL_VALLEY_URLS = [
     "https://cerebralvalley.ai/",
     "https://cerebralvalley.ai/events",
+    # cerebralvalley.ai/events?startDate=YYYY-MM-DD re-anchors the listing to
+    # an earlier date instead of only "what's current right now" - confirmed
+    # via lightpanda that this actually changes the hydrated event list
+    # (not just a client-side no-op). A couple of monthly anchors going back
+    # gets meaningfully more historical coverage than the single present-day
+    # listing, without going so wide that one poll cycle balloons (each of
+    # these is its own lightpanda fetch, ~15s+).
+    "https://cerebralvalley.ai/events?startDate=2026-08-01",
+    "https://cerebralvalley.ai/events?startDate=2026-09-01",
 ]
 LABLAB_URLS = [
     "https://lablab.ai/event",

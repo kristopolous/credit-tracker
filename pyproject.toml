@@ -21,11 +21,6 @@ dependencies = [
     "pillow",
 ]
 
-[project.optional-dependencies]
-cognee = ["cognee"]
-strands = ["strands-agents"]
-all = ["cognee", "strands-agents"]
-
 [project.scripts]
 sponsor-credit-feed = "sponsor_credit_feed.cli:main"
 

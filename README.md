@@ -1,8 +1,7 @@
 # Sponsor Credit Feed
 
 Live aggregator of sponsor credit-redemption codes and QR codes posted across
-hackathon platforms — built for **Battle of the Personal Brains**
-(Cognee × AWS Strands × Bright Data, Sep 21 2026).
+hackathon platforms.
 
 It crawls Luma, Cerebral Valley, and lablab.ai (not just one event each — see
 [Crawling](#crawling)), scores snippets of text for "this looks like a real
@@ -15,9 +14,9 @@ Event descriptions themselves rarely contain the literal code - hosts post it
 in a linked "resources" doc instead. `sources/link_discovery.py` follows
 links found in scraped text (resolving shortlinks like bit.ly along the way)
 and, when one resolves to a Google Doc, pulls its plain text via Google's
-export endpoint. That's how tonight's actual codes get found: the Luma page
-links to a bit.ly which resolves to a Google Doc containing the real Cognee
-(`PERSONALBRAIN0926`) and Bright Data (`cognee50`) promo codes.
+export endpoint. That's how real codes get found in practice: a Luma page
+links to a bit.ly which resolves to a Google Doc containing the actual
+promo codes (e.g. Cognee's `PERSONALBRAIN0926`, Bright Data's `cognee50`).
 
 ## Install & run
 
@@ -30,7 +29,7 @@ sponsor-credit-feed --port 9000  # custom port
 Or for local dev with auto-reload: `./run.sh`.
 
 First run seeds a couple of demo cards so the UI isn't empty while waiting
-for the first crawl (every 10 minutes by default — see [Crawling](#crawling)
+for the first crawl (every 90 minutes by default — see [Crawling](#crawling)
 for why it's not faster). To wire up sponsor credits, copy `.env.example` to
 `.env` and fill in whatever keys you've redeemed.
 
@@ -59,16 +58,11 @@ content.
 
 ## Ranking
 
-Not every event publishes a literal redeemable code - some just mention "$X
-credits" in passing. Those aren't useless (real signal), but they're not
-actionable either, so the feed ranks anything with a literal code or QR
-above everything else, and sorts each tier by recency. Nothing is dropped;
-a no-code mention just sinks to the bottom instead of competing with real
-codes for the top slot.
+Every card in the feed already has both a literal code (or QR) and an
+identifiable company — see [How detection works](#how-detection-works) — so
+there's no separate "maybe" tier to rank down. Cards are sorted by recency.
 
-## Sponsor integration
-
-This maps onto all three of tonight's sponsors:
+## Fetching
 
 - **Bright Data** — `sources/base.py` routes fetches through Bright Data's
   Web Unlocker API when `BRIGHTDATA_API_KEY` is set (falls back to a plain
@@ -76,39 +70,51 @@ This maps onto all three of tonight's sponsors:
   [Crawling](#crawling)). The zone name is account-specific - find yours
   with `curl https://api.brightdata.com/zone/get_active_zones -H "Authorization: Bearer $BRIGHTDATA_API_KEY"`
   rather than assuming a default.
-- **Cognee** — `memory/cognee_memory.py` is an optional enrichment layer:
-  every accepted item is remembered in a Cognee-built knowledge graph, and
-  new candidates are checked against it for semantic duplicates (catches
-  reposts/paraphrases that plain string matching misses). Supports both
-  Cognee Cloud (`COGNEE_API_KEY` + `COGNEE_SERVICE_URL`, the latter from the
-  API Keys page in the Cognee Cloud console) and local mode (`LLM_API_KEY`
-  only).
-- **AWS Strands Agents** — `extract/agent.py` is an optional second-pass
-  classifier: ambiguous snippets that pass the regex heuristics get a
-  yes/no + structured extraction from a Strands agent running on Bedrock.
-  Enable with `STRANDS_ENABLED=true` + AWS credentials.
+- **Lightpanda** — `sources/base.py`'s `fetch_rendered()` shells out to the
+  [lightpanda](https://github.com/lightpanda-io/browser) headless,
+  JS-executing browser CLI for listing/hub pages
+  (`cerebralvalley.ai/events`, `lablab.ai/event`) that populate their event
+  cards client-side after load, where a plain GET only sees the
+  pre-hydration shell. Falls back to the plain fetch path if lightpanda
+  isn't installed. Individual event pages don't need this — they're already
+  server-rendered.
 
-Every one of these is **optional and gracefully no-ops without credentials**
-— the aggregator runs fully on regex heuristics + SQLite out of the box, so
-it's always demoable regardless of what's been redeemed. Install them with
-`pip install -e ".[cognee,strands]"` (or `".[all]"` for both).
+Both are optional and gracefully no-op without the binary/credentials
+present — the aggregator runs fully on regex heuristics + SQLite out of the
+box, so it's always demoable.
 
 ## How detection works
 
-`extract/code_detector.py` scores each text snippet on:
+`extract/code_detector.py` requires **both** of these before it will ever
+surface a card - there is no lower tier:
 
-- a `$NN in credits` phrase (not just any dollar amount — avoids flagging
-  generic prize pools), including shorthand like `$5k`
-- code keywords (`promo code`, `redeem code`, `coupon`, `voucher`, …) plus an
-  attempt to pull the literal code token out (`code: cognee50`)
-- QR-code language (`scan the QR code`, …)
+- a literal redemption code (`code: cognee50`, `promo code: VERCEL25`, …) or
+  an actual QR code image
+- an identifiable company the code belongs to
 
-...and excludes anything that looks like a prize/reward rather than an
-upfront giveaway: explicit language (`prize pool`, `compete for`, `for the
-winners`, `1st place`, …), and independently, a sanity-check on amount size -
-nobody hands out $500+ in free credits just for showing up, so a bare dollar
-amount above that without a literal code to prove otherwise is assumed to be
-a prize, not a giveaway.
+A dollar amount alone (`$1000 in AWS credits`) is not a result on its own -
+it's just a fact folded into a card that already has a real code. This is
+deliberate: showing "there might be a code on this page, for $5000, maybe"
+is worse than useless, so nothing gets a card without both a code and a
+company attached.
+
+Company resolution is **not** a hardcoded sponsor list — a fixed whitelist
+would silently drop every sponsor it doesn't already know about, which is
+most of them at any given hackathon. Instead:
+
+1. If the snippet has a redeem link, the company is derived from that
+   link's own domain (e.g. `platform.cognee.ai` → `Cognee`,
+   `brightdata.com` → `Brightdata`). This also correctly handles
+   cross-promos — a code like `cognee50` that's actually redeemed *at*
+   Bright Data resolves to Bright Data, not Cognee, because the domain is
+   authoritative over the code text.
+2. Otherwise, a capitalized company/product name sitting directly next to
+   the code keyword (`Nebius redemption code: NEBIUSHACK50` → `Nebius`),
+   filtered against a small stoplist of ordinary English sentence-starters
+   (`Use code:`, `Enter code:`) that could otherwise look like a name.
+
+If neither resolves a company, the candidate is dropped — a code with no
+identifiable owner isn't a usable result either.
 
 `extract/qr_detector.py` can additionally decode an actual QR code image via
 OpenCV if a page links one (no `libzbar` system dependency needed).
@@ -123,8 +129,7 @@ sponsor_credit_feed/
                     + recursive Luma calendar discovery), link_discovery.py
                     (follows links out to resource docs), base.py (shared
                     fetch() + per-host throttle())
-  extract/       - regex heuristics + optional Strands classifier + QR decode
-  memory/        - optional Cognee knowledge-graph enrichment
+  extract/       - regex heuristics + QR decode
   feed_store.py  - SQLite store + global near-dup filtering + SSE pub/sub
   poller.py      - background loop tying it all together
   main.py        - FastAPI app: /api/feed, /api/stream (SSE), static UI
@@ -134,13 +139,12 @@ sponsor_credit_feed/
 
 ## Known limitations
 
-- Cerebral Valley and lablab.ai are scraped as server-rendered HTML text
-  only — content injected client-side after hydration won't be seen (no
-  headless browser in the loop). Add one (e.g. Bright Data's Scraping
-  Browser) if that turns out to matter.
-- No platform here exposes a public "past events" archive API, so historical
-  coverage is opportunistic (whatever a listing/calendar page currently
-  links to) rather than a true date-range query - an event that's fully
-  scrolled off every listing page won't be found.
+- lablab.ai has no equivalent of Cerebral Valley's `?startDate=` param that
+  we've found yet, so its historical coverage is still just "whatever the
+  current listing page links to."
 - Source URL lists are hardcoded in `main.py` — add more event/listing URLs
-  there as you find them.
+  there as you find them. Cerebral Valley's `/events?startDate=YYYY-MM-DD`
+  re-anchors its listing to an earlier date (confirmed via lightpanda that
+  this actually changes the hydrated results, not a no-op) — `main.py`
+  currently seeds a couple of monthly anchors; add more/earlier ones for
+  deeper history.

@@ -5,7 +5,9 @@ const dotEl = document.getElementById("conn-dot");
 const labelEl = document.getElementById("conn-label");
 const filtersEl = document.getElementById("filters");
 
-const KIND_LABELS = { credit: "Credit", code: "Code", qr: "QR" };
+// "credit" kind is unreachable - code_detector.py's find_candidates()
+// always requires a literal code or QR to surface a candidate at all.
+const KIND_LABELS = { code: "Code", qr: "QR" };
 
 let items = [];
 let activeFilter = "all";
@@ -68,16 +70,11 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// A deal without an actual usable code/QR is just "we saw a dollar amount
-// somewhere" - real signal, but not something you can act on. Those rank
-// below anything with a literal code, rather than by recency alone.
-function isActionable(item) {
-  return item.codes.length > 0 || item.kind === "qr";
-}
-
+// Every stored item already has a literal code/QR and a resolved company
+// (see code_detector.py's find_candidates) - nothing vaguer than that ever
+// makes it into the feed, so there's no separate "actionable" tier to sort
+// by. Just recency.
 function compareItems(a, b) {
-  const tierDiff = (isActionable(b) ? 1 : 0) - (isActionable(a) ? 1 : 0);
-  if (tierDiff !== 0) return tierDiff;
   return b.discovered_at - a.discovered_at;
 }
 
@@ -112,7 +109,6 @@ function groupByEvent(list) {
   for (const g of groups.values()) {
     g.deals.sort(compareItems);
     g.latestAt = Math.max(...g.deals.map((d) => d.discovered_at));
-    g.actionable = g.deals.some(isActionable);
     const realTitle = g.deals.map((d) => d.event_title).find(Boolean);
     g.title = realTitle || guessTitleFromUrl(g.eventUrl);
   }
@@ -120,8 +116,6 @@ function groupByEvent(list) {
 }
 
 function compareGroups(a, b) {
-  const tierDiff = (b.actionable ? 1 : 0) - (a.actionable ? 1 : 0);
-  if (tierDiff !== 0) return tierDiff;
   return b.latestAt - a.latestAt;
 }
 
