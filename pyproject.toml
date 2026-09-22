@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sponsor-credit-feed"
+version = "0.1.0"
+description = "Live feed of hackathon sponsor credit/promo codes aggregated across Luma, Cerebral Valley, and lablab.ai"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "beautifulsoup4",
+    "lxml",
+    "python-dotenv",
+    "opencv-python-headless",
+    "numpy",
+    "pillow",
+]
+
+[project.optional-dependencies]
+cognee = ["cognee"]
+strands = ["strands-agents"]
+all = ["cognee", "strands-agents"]
+
+[project.scripts]
+sponsor-credit-feed = "sponsor_credit_feed.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sponsor_credit_feed*"]
+
+[tool.setuptools.package-data]
+sponsor_credit_feed = ["static/*"]

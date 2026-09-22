@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sponsor Credit Feed</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎟️ Sponsor Credit Feed</h1>
+    <p class="sub">Live aggregation of credit codes &amp; QR redemptions across Luma, Cerebral Valley &amp; lablab.ai</p>
+    <div class="status">
+      <span id="conn-dot" class="dot dot-off"></span>
+      <span id="conn-label">connecting…</span>
+      <span class="count" id="item-count">0 items</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="filters" id="filters"></div>
+    <div id="feed" class="feed"></div>
+    <div id="empty" class="empty hidden">No sponsor codes found yet — waiting on the next poll.</div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

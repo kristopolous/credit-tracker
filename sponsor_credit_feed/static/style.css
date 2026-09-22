@@ -1,0 +1,146 @@
+:root {
+  --bg: #0b0e14;
+  --panel: #131722;
+  --panel-2: #1b2030;
+  --border: #262c3d;
+  --text: #e8ebf3;
+  --text-dim: #8b93a7;
+  --accent: #7c9cff;
+  --credit: #4cd97b;
+  --code: #f7b955;
+  --qr: #c98bff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+header {
+  padding: 28px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #141a2a 0%, var(--bg) 100%);
+}
+
+h1 { margin: 0 0 4px; font-size: 1.6rem; }
+.sub { margin: 0 0 14px; color: var(--text-dim); font-size: 0.92rem; }
+
+.status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
+.dot-on { background: var(--credit); box-shadow: 0 0 8px var(--credit); }
+.dot-off { background: #555; }
+.count { margin-left: auto; }
+
+main { max-width: 880px; margin: 0 auto; padding: 20px 16px 60px; }
+
+.filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.filters button {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.filters button.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.feed { display: flex; flex-direction: column; gap: 12px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  animation: slide-in 0.35s ease;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.event-card { padding: 16px 18px 6px; }
+
+.event-top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.event-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.deal-count { font-size: 0.75rem; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
+
+.event-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+
+.deals { display: flex; flex-direction: column; gap: 0; }
+.deal {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  animation: slide-in 0.35s ease;
+}
+.deal:first-child { border-top: 1px solid var(--border); }
+
+.deal-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+
+.card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+
+.badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.badge-credit { background: rgba(76,217,123,0.15); color: var(--credit); }
+.badge-code { background: rgba(247,185,85,0.15); color: var(--code); }
+.badge-qr { background: rgba(201,139,255,0.15); color: var(--qr); }
+
+.source-tag { font-size: 0.75rem; color: var(--text-dim); background: var(--panel-2); padding: 3px 9px; border-radius: 999px; }
+.time-tag { font-size: 0.75rem; color: var(--text-dim); margin-left: auto; }
+
+.text { font-size: 0.88rem; line-height: 1.5; margin: 0 0 10px; color: var(--text-dim); white-space: pre-wrap; }
+.text a { color: var(--accent); }
+
+.facts { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.fact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+.fact-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+.fact-value { font-size: 0.95rem; font-weight: 600; }
+.fact-code .fact-value { color: var(--code); }
+.fact-amount .fact-value { color: var(--credit); }
+.mono { font-family: "SF Mono", Consolas, Monaco, monospace; letter-spacing: 0.02em; }
+
+.card-links { display: flex; gap: 16px; margin-top: 8px; align-items: center; }
+.card a.src-link { color: var(--text-dim); font-size: 0.78rem; text-decoration: none; }
+.card a.src-link:hover { color: var(--accent); }
+.card a.redeem-link {
+  color: var(--bg);
+  background: var(--credit);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.card a.redeem-link:hover { filter: brightness(1.1); }
+
+.empty { text-align: center; color: var(--text-dim); padding: 60px 20px; }
+.hidden { display: none; }
