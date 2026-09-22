@@ -9,8 +9,10 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from sponsor_credit_feed import config
 from sponsor_credit_feed.feed_store import store
 from sponsor_credit_feed.poller import run_forever
+from sponsor_credit_feed.status import status
 from sponsor_credit_feed.sources.luma_source import LumaSource
 from sponsor_credit_feed.sources.generic_html_source import GenericHtmlSource
 from sponsor_credit_feed.sources.hub_source import HubSource
@@ -68,6 +70,14 @@ app = FastAPI(title="Sponsor Credit Feed", lifespan=lifespan)
 @app.get("/api/feed")
 async def get_feed(limit: int = 200):
     return store.recent(limit=limit)
+
+
+@app.get("/api/status")
+async def get_status():
+    d = status.to_dict()
+    d["sources_total"] = len(SOURCES)
+    d["poll_interval_seconds"] = config.POLL_INTERVAL_SECONDS
+    return d
 
 
 @app.get("/api/stream")

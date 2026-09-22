@@ -4,6 +4,8 @@ const countEl = document.getElementById("item-count");
 const dotEl = document.getElementById("conn-dot");
 const labelEl = document.getElementById("conn-label");
 const filtersEl = document.getElementById("filters");
+const crawlStatusEl = document.getElementById("crawl-status");
+const crawlSourcesEl = document.getElementById("crawl-sources");
 
 // "credit" kind is unreachable - code_detector.py's find_candidates()
 // always requires a literal code or QR to surface a candidate at all.
@@ -234,6 +236,92 @@ function connect() {
   };
 }
 
+function fmtAgo(ts) {
+  if (!ts) return null;
+  const secs = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (secs < 5) return "just now";
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  return `${Math.floor(secs / 3600)}h ago`;
+}
+
+function fmtETA(secondsFromNow) {
+  if (secondsFromNow == null) return null;
+  const m = Math.max(0, Math.round(secondsFromNow / 60));
+  if (m < 1) return "any moment";
+  if (m < 60) return `~${m}m`;
+  return `~${(m / 60).toFixed(1)}h`;
+}
+
+// Renders exactly what the crawler actually did, with real numbers - "this
+// really did check N pages Xm ago" is the whole point, not a decorative
+// "live" dot. Also renders a per-source breakdown (toggle-able) so the
+// claim is checkable, not just asserted.
+let lastStatus = null;
+
+function renderCrawlStatus(s) {
+  lastStatus = s;
+  const parts = [];
+  if (s.in_progress) {
+    const doneCount = s.sources_done || 0;
+    parts.push(`checking now — ${doneCount}/${s.sources_total} sources, ${s.total_checked} pages so far`);
+  } else if (s.last_completed_at) {
+    const ago = fmtAgo(s.last_completed_at);
+    parts.push(`checked ${s.total_checked} pages across ${s.sources.length} sources ${ago}`);
+    parts.push(
+      `${s.total_candidates} new code${s.total_candidates === 1 ? "" : "s"} found this pass, ` +
+        `${items.length} total in feed`,
+    );
+    if (s.poll_interval_seconds) {
+      const nextIn = s.last_completed_at + s.poll_interval_seconds - Date.now() / 1000;
+      const eta = fmtETA(nextIn);
+      if (eta) parts.push(`next check ${eta}`);
+    }
+  } else {
+    parts.push("first crawl hasn't finished yet…");
+  }
+  crawlStatusEl.textContent = parts.join(" · ");
+  crawlStatusEl.onclick = () => {
+    crawlSourcesEl.classList.toggle("hidden");
+    renderCrawlSources(s);
+  };
+  if (!crawlSourcesEl.classList.contains("hidden")) renderCrawlSources(s);
+}
+
+function renderCrawlSources(s) {
+  if (!s.sources || !s.sources.length) {
+    crawlSourcesEl.innerHTML = `<div class="crawl-source-row">no sources have reported yet</div>`;
+    return;
+  }
+  crawlSourcesEl.innerHTML = s.sources
+    .map((src) => {
+      const errTag = src.error ? `<span class="crawl-source-err" title="${escapeHtml(src.error)}">failed</span>` : "";
+      return `<div class="crawl-source-row">
+        <span class="crawl-source-label">${escapeHtml(src.label)}</span>
+        <span class="crawl-source-nums">${src.blobs_checked} page${src.blobs_checked === 1 ? "" : "s"} checked, ${src.candidates_found} new code${src.candidates_found === 1 ? "" : "s"}</span>
+        ${errTag}
+      </div>`;
+    })
+    .join("");
+}
+
+async function pollCrawlStatus() {
+  try {
+    const resp = await fetch("/api/status");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    renderCrawlStatus(await resp.json());
+  } catch (err) {
+    crawlStatusEl.textContent = "couldn't reach crawl status";
+    console.error(err);
+  }
+}
+
+// Re-render the relative "Xm ago" / countdown text every tick even without
+// a fresh fetch, then actually re-fetch on a slower cadence.
+setInterval(() => { if (lastStatus) renderCrawlStatus(lastStatus); }, 15000);
+setInterval(pollCrawlStatus, 20000);
+
 setInterval(refreshTimeTags, 30000); // keep "time ago" labels fresh, no flash
 renderFilters();
 connect();
+pollCrawlStatus();

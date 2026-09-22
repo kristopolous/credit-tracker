@@ -56,6 +56,36 @@ Cloudflare's bot challenge for that zone on luma.com, every subsequent
 request through it silently gets a JS challenge page back instead of real
 content.
 
+## Crawl transparency
+
+A bare "live" dot doesn't prove anything actually got checked. The backend
+tracks real stats for the current (or most recently completed) poll cycle in
+`status.py` and exposes them at `GET /api/status`:
+
+```json
+{
+  "in_progress": false,
+  "last_completed_at": 1758,
+  "total_checked": 80,
+  "total_candidates": 2,
+  "sources_done": 6,
+  "sources_total": 6,
+  "sources": [
+    {"label": "luma/LumaSource", "blobs_checked": 2, "candidates_found": 2, "error": null},
+    {"label": "cerebral_valley/HubSource", "blobs_checked": 60, "candidates_found": 0, "error": null},
+    ...
+  ],
+  "poll_interval_seconds": 5400
+}
+```
+
+`poller.py` records per-source counts (pages/events fetched, candidates
+that survived detection, and any error) as each source finishes, both mid-cycle
+and at completion. The frontend polls this endpoint and renders it in the
+header as "checked N pages across M sources Xm ago · found Y real codes this
+pass", clickable to expand a per-source breakdown - so a low result count is
+visibly the result of having actually looked, not a mystery.
+
 ## Ranking
 
 Every card in the feed already has both a literal code (or QR) and an
@@ -115,6 +145,42 @@ most of them at any given hackathon. Instead:
 
 If neither resolves a company, the candidate is dropped — a code with no
 identifiable owner isn't a usable result either.
+
+**Sponsor copy is detected in Chinese, Spanish, Portuguese and Japanese
+too, not just English.** Same hard requirement in every language: a
+literal code (or QR) plus an identifiable company, no exceptions, no
+per-language sponsor whitelist.
+
+- **Chinese**: keyword patterns match 优惠码/兑换码/折扣码/邀请码/促销码/
+  推荐码/访问码/解锁码/礼品码/激活码 and 二维码/扫码 for QR.
+- **Japanese**: matches katakana loanwords like クーポンコード/プロモコード/
+  割引コード/招待コード/紹介コード and QRコードをスキャン for QR.
+- **Spanish**: matches código promocional/código de descuento/cupón de
+  descuento/código de canje/código de invitación, etc. Unlike English
+  ("promo code" — trigger word last), the Spanish/Portuguese trigger word
+  ("código"/"cupón") comes *first*, so these are matched as full phrases
+  rather than a single head-noun pattern, which also avoids false
+  positives like "código postal" (zip code).
+- **Portuguese**: matches código promocional/código de desconto/cupom de
+  desconto/código de resgate/código de convite, etc. — same phrase-first
+  shape as Spanish.
+
+Sentence splitting also handles full-width `。！？` punctuation (Chinese
+and Japanese both use it, and unlike English don't put a space after it).
+Company resolution works the same way regardless of language: the
+redeem-link domain is authoritative when present (language-independent,
+since it only looks at the URL); otherwise a name sitting right next to
+the code keyword — which works whether that name is in the local script
+(`英伟达兑换码：GPU50HACK` → `英伟达`, `任天堂クーポンコード：SWITCH20` →
+`任天堂`) or a Latin-script brand name inside otherwise-local-language
+copy (`Nebius código promocional: NEBIUSHACK50` → `Nebius`, `Nebius
+クーポンコード：NEBIUSHACK50` → `Nebius`) — a common case, since global
+sponsors' names usually aren't translated even in local-language event
+copy. Same rule as English throughout: a bare prize-pool mention with no
+literal code is still dropped in every language, and each language has its
+own stoplist of generic instruction phrases (`Usa el código…`, `使用优惠
+码…`, `クーポンコードをご利用ください…`) that get filtered rather than
+mistaken for a company name.
 
 `extract/qr_detector.py` can additionally decode an actual QR code image via
 OpenCV if a page links one (no `libzbar` system dependency needed).

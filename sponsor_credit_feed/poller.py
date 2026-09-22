@@ -9,16 +9,21 @@ from sponsor_credit_feed import config
 from sponsor_credit_feed.extract.code_detector import find_candidates
 from sponsor_credit_feed.feed_store import store
 from sponsor_credit_feed.sources.base import Source, platform_of
+from sponsor_credit_feed.status import status
 
 log = logging.getLogger("poller")
 
 
 async def _handle_source(client: httpx.AsyncClient, source: Source) -> None:
+    label = f"{source.name}/{type(source).__name__}"
     try:
         blobs = await source.poll(client)
-    except Exception:
+    except Exception as exc:
         log.exception("source %s failed to poll", source.name)
+        status.record_source(label, blobs_checked=0, candidates_found=0, error=str(exc)[:200])
         return
+
+    candidates_found = 0
 
     for blob in blobs:
         if blob.get("title"):
@@ -69,10 +74,16 @@ async def _handle_source(client: httpx.AsyncClient, source: Source) -> None:
                 redeem_url=c.redeem_url,
                 service=c.service,
             )
+            if item is not None:
+                candidates_found += 1
+
+    status.record_source(label, blobs_checked=len(blobs), candidates_found=candidates_found)
 
 
 async def run_forever(sources: list[Source]) -> None:
     async with httpx.AsyncClient() as client:
         while True:
+            status.start_cycle()
             await asyncio.gather(*(_handle_source(client, s) for s in sources))
+            status.finish_cycle()
             await asyncio.sleep(config.POLL_INTERVAL_SECONDS)

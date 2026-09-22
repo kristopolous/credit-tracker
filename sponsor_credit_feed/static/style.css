@@ -36,6 +36,45 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 .dot-off { background: #555; }
 .count { margin-left: auto; }
 
+.crawl-status {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.crawl-status:hover { color: var(--text); border-color: var(--accent); }
+
+.crawl-sources {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+}
+.crawl-source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+}
+.crawl-source-label { font-weight: 600; color: var(--text); min-width: 220px; }
+.crawl-source-nums { flex: 1; }
+.crawl-source-err {
+  color: #ff7a7a;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
 main { max-width: 880px; margin: 0 auto; padding: 20px 16px 60px; }
 
 .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
